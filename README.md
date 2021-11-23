@@ -77,7 +77,7 @@ Espacio para implementar las funciones que necesites.
     -d<dirección>   Dirección del servidor
     -p<puerto>      Servicio o número de puerto del servidor
 ```
-`client example`
+`ejemplo cliente`
 ```shell
 cat fichero.txt | ./rcftpclient -v -a1 -d155.210.152.183 -p32002
 ```
@@ -96,7 +96,7 @@ cat fichero.txt | ./rcftpclient -v -a1 -d155.210.152.183 -p32002
     -t[Ttrans]      Tiempo de transmisión a simular, en microsegundos (por defecto: 200000)
     -r[Tprop]       Tiempo de propagación a simular, en microsegundos (por defecto: 250000)
 ```
-`client example`
+`ejemplo servidor`
 ```shell
 ./rcftpd -p32002 -v -a0  
 ```
