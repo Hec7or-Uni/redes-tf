@@ -77,6 +77,10 @@ Espacio para implementar las funciones que necesites.
     -d<dirección>   Dirección del servidor
     -p<puerto>      Servicio o número de puerto del servidor
 ```
+`client example`
+```shell
+cat fichero.txt | ./rcftpclient -v -a1 -d155.210.152.183 -p32002
+```
 
 `servidor`
 ```shell
@@ -91,6 +95,10 @@ Espacio para implementar las funciones que necesites.
     -e[frec]        Fuerza en media un mensaje incorrecto de cada [frec] (por defecto: 5)
     -t[Ttrans]      Tiempo de transmisión a simular, en microsegundos (por defecto: 200000)
     -r[Tprop]       Tiempo de propagación a simular, en microsegundos (por defecto: 250000)
+```
+`client example`
+```shell
+./rcftpd -p32002 -v -a0  
 ```
 **Nota**: Los algoritmos 1-3 generan errores aleatoriamente. Además, los algoritmos 1 y 2
 mantienen el error generado hasta que el cliente responda correctamente.
