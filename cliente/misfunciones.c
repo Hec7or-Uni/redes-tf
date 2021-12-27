@@ -245,7 +245,7 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 /**************************************************************************/
 /* Funcion envio de mensaje */
 /**************************************************************************/
-void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
+ssize_t enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
 	ssize_t datosEnviados = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
 	if (datosEnviados != sizeof(*mensaje_enviar) || datosEnviados < 0)
@@ -253,11 +253,12 @@ void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *
 		printf("Error en sendto");
 		exit(1);
 	}
+	return datosEnviados;
 }
 /**************************************************************************/
 /*  Función para recibir datos  */
 /**************************************************************************/
-void recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
+ssize_t recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
 {
 	ssize_t recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
 	if (errno != EAGAIN && recvsize < 0)
@@ -265,6 +266,7 @@ void recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addri
 		printf("Error en rcvfrom");
 		exit(1);
 	}
+	return recvsize;
 }
 
 /**************************************************************************/
@@ -367,11 +369,74 @@ void alg_basico(int socket, struct addrinfo *servinfo)
 
 void alg_stopwait(int socket, struct addrinfo *servinfo)
 {
+	int sockflags;
+	int timeouts_procesados = 0;
+	sockflags = fcntl(socket, F_GETFL, 0);
+	fcntl(socket, F_SETFL, sockflags | O_NONBLOCK);
+	signal(SIGALRM, handle_sigalrm);
 
-	printf("Comunicación con algoritmo stop&wait\n");
+	int ultimoMensaje = 0;
+	int ultimoMensajeConfirmado = 0;
 
-#warning FALTA IMPLEMENTAR EL ALGORITMO STOP-WAIT
-	printf("Algoritmo no implementado\n");
+	char buffer[RCFTP_BUFLEN];		   // Buffer para almacenar los datos.
+	ssize_t len;					   // Longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0;			   // Número de secuencia
+	struct rcftp_msg mensajeEnvio;	   // Estructura de el envío.
+	struct rcftp_msg mensajeRespuesta; // Estructura de la respuesta
+
+	len = readtobuffer(buffer, RCFTP_BUFLEN);
+	if (len < RCFTP_BUFLEN && len >= 0)
+	{
+		ultimoMensaje = 1;
+	}
+
+	mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
+
+	while (ultimoMensajeConfirmado == 0)
+	{
+		enviarDatos(&mensajeEnvio, socket, servinfo->ai_addr, servinfo->ai_addrlen);
+		printf("Mensaje enviado\n");
+		print_rcftp_msg(&mensajeEnvio, sizeof(mensajeEnvio));
+
+		addtimeout();
+		int esperar = 1;
+		int datosRecibidos;
+
+		while (esperar)
+		{
+			datosRecibidos = recibirDatos(socket, &mensajeRespuesta, sizeof(mensajeRespuesta), servinfo);
+			if (datosRecibidos > 0)
+			{
+				canceltimeout();
+				esperar = 0;
+				printf("Mensaje recibido\n");
+				print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
+			}
+			if (timeouts_procesados != timeouts_vencidos)
+			{
+				esperar = 0;
+				timeouts_procesados++;
+			}
+		}
+
+		if (esMensajeValido(mensajeRespuesta) && respuestaEsperada(mensajeEnvio, mensajeRespuesta))
+		{
+			if (ultimoMensaje == 1)
+			{
+				ultimoMensajeConfirmado = 1;
+			}
+			else
+			{
+				numeroSec = numeroSec + len;
+				len = readtobuffer(buffer, RCFTP_BUFLEN);
+				if (len < RCFTP_BUFLEN && len >= 0)
+				{
+					ultimoMensaje = 1;
+				}
+				mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
+			}
+		}
+	}
 }
 
 void alg_ventana(int socket, struct addrinfo *servinfo, int window)
