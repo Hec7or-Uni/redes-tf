@@ -280,12 +280,15 @@ int esMensajeValido(struct rcftp_msg mensaje)
 /**************************************************************************/
 int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv)
 {
-	if (mensaje_sent.flags == F_FIN) {
+	if (mensaje_sent.flags == F_FIN)
+	{
 		return mensaje_recv.flags == F_FIN &&
-			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
+			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	} else {
-		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
+	}
+	else
+	{
+		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
 	}
 }
@@ -293,14 +296,14 @@ int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_re
 /**************************************************************************/
 /* Funcion crear mensaje: Crea un mensaje nuevo RCFTP */
 /**************************************************************************/
-struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, int ultimoMensaje)
+struct rcftp_msg crearMensajeRCFTP(char *mensaje, size_t length, size_t numseq, int ultimoMensaje)
 {
 	struct rcftp_msg mensaje_enviar;
 	mensaje_enviar.version = RCFTP_VERSION_1;
-	mensaje_enviar.flags   = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
-	mensaje_enviar.numseq  = htonl((uint32_t)numseq);
-	mensaje_enviar.next    = htonl(0);
-	mensaje_enviar.len     = htons((uint16_t)length);
+	mensaje_enviar.flags = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
+	mensaje_enviar.numseq = htonl((uint32_t)numseq);
+	mensaje_enviar.next = htonl(0);
+	mensaje_enviar.len = htons((uint16_t)length);
 	int j;
 	for (j = 0; j < length; j++)
 	{
@@ -318,11 +321,11 @@ void alg_basico(int socket, struct addrinfo *servinfo)
 {
 	int ultimoMensaje = 0;
 	int ultimoMensajeConfirmado = 0;
-	char buffer[RCFTP_BUFLEN]; 			// Buffer para almacenar los datos. 
-	ssize_t length;						// longitud de lo que vamos a leer del fichero
-	ssize_t numeroSec = 0;				// numero de secuencia
-	struct rcftp_msg mensaje;			// Estructura de el envío.
-	struct rcftp_msg respuesta;			// Estructura de la respuesta
+	char buffer[RCFTP_BUFLEN];	// Buffer para almacenar los datos.
+	ssize_t length;				// longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0;		// numero de secuencia
+	struct rcftp_msg mensaje;	// Estructura de el envío.
+	struct rcftp_msg respuesta; // Estructura de la respuesta
 
 	length = readtobuffer(buffer, RCFTP_BUFLEN);
 	if (length < RCFTP_BUFLEN && length >= 0)

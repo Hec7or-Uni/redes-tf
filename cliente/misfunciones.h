@@ -54,10 +54,10 @@ void recibirDatos(int socket, struct rcftp_msg *respuesta, int length, struct ad
 /**
  * Funcion crear mensaje: Crea un mensaje nuevo RCFTP
  *
- * @param[in] mensaje
- * @param[in] length
- * @param[in] numseq
- * @param[in] ultimoMensaje 
+ * @param[in] mensaje contenido del mensaje RCFTP a crear
+ * @param[in] length longitud del mensaje a escribir
+ * @param[in] numseq numero de secuencia actual
+ * @param[in] ultimoMensaje booleano que indica si es el mensaje final
  * @return struct rcftp_msg
  */
 struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, int ultimoMensaje);
@@ -65,7 +65,7 @@ struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, 
 /**
  * Funcion crear mensaje: Crea un mensaje nuevo RCFTP
  *
- * @param[in] mensaje
+ * @param[in] mensaje mensaje con el formato RCFTP
  * @return 1: valido, 0: invalido
  */
 int esMensajeValido(struct rcftp_msg mensaje);
@@ -73,8 +73,8 @@ int esMensajeValido(struct rcftp_msg mensaje);
 /**
  * Comprobacion de respuesta esperada correctamente.
  *
- * @param[in] mensaje_sent
- * @param[in] mensaje_recv
+ * @param[in] mensaje_sent mensaje enviado
+ * @param[in] mensaje_recv mensaje recibido
  * @return 1: esperada, 0: no esperada
  */
 int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv);
