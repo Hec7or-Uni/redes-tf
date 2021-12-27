@@ -82,6 +82,17 @@ int esMensajeValido(struct rcftp_msg mensaje);
 int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv);
 
 /**
+ * Comprueba que es la respuesta esperada
+ * 
+ * @param[in] mensaje_sent mensaje enviado
+ * @param[in] mensaje_recv mensaje recibido
+ * @param[in] next_min_win valor minimo de la ventana
+ * @param[in] next_max_win valor maximo de la ventana
+ * @return 1: esperada, 0: no esperada
+ */
+int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win);
+
+/**
  * Algoritmo 1 del cliente
  *
  * @param[in] socket Descriptor del socket
