@@ -28,10 +28,13 @@
 #include "rcftpclient.h" // Funciones ya implementadas
 #include "multialarm.h"	 // Gestión de timeouts
 #include "misfunciones.h"
+#include "vemision.h"
 
 /**************************************************************************/
 /* VARIABLES GLOBALES                                                     */
 /**************************************************************************/
+// elegir 1 o 2 autores y sustituir "Apellidos, Nombre" manteniendo el formato
+// char* autores="Autor: Apellidos, Nombre"; // un solo autor
 char *autores = "Autor: Toral Pallás, Héctor\nAutor: Pizarro Martinez, Francisco Javier"; // dos autores
 
 // variable para indicar si mostrar información extra durante la ejecución
@@ -42,6 +45,9 @@ extern char verb;
 // Uso: Comparar con otra variable inicializada a 0; si son distintas, tratar un timeout e incrementar en uno la otra variable
 extern volatile const int timeouts_vencidos;
 
+/**************************************************************************/
+/* Obtiene la estructura de direcciones del servidor */
+/**************************************************************************/
 struct addrinfo *obtener_struct_direccion(char *dir_servidor, char *servicio, char f_verbose)
 {
 	struct addrinfo hints;		// variable para especificar la solicitud
@@ -160,6 +166,9 @@ struct addrinfo *obtener_struct_direccion(char *dir_servidor, char *servicio, ch
 	return servinfo;
 }
 
+/**************************************************************************/
+/* Imprime una direccion */
+/**************************************************************************/
 void printsockaddr(struct sockaddr_storage *saddr)
 {
 	struct sockaddr_in *saddr_ipv4; // puntero a estructura de dirección IPv4
@@ -207,7 +216,9 @@ void printsockaddr(struct sockaddr_storage *saddr)
 		printf("\tPuerto (formato local): %d\n", port);
 	}
 }
-
+/**************************************************************************/
+/* Configura el socket, devuelve el socket y servinfo */
+/**************************************************************************/
 int initsocket(struct addrinfo *servinfo, char f_verbose)
 {
 	int sock;
@@ -232,8 +243,10 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 
 	return sock;
 }
-
-ssize_t enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
+/**************************************************************************/
+/* Funcion envio de mensaje */
+/**************************************************************************/
+void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
 	ssize_t datosEnviados = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
 	if (datosEnviados != sizeof(*mensaje_enviar) || datosEnviados < 0)
@@ -241,10 +254,11 @@ ssize_t enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockadd
 		printf("Error en sendto");
 		exit(1);
 	}
-	return datosEnviados;
 }
-
-ssize_t recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
+/**************************************************************************/
+/*  Función para recibir datos  */
+/**************************************************************************/
+int recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
 {
 	ssize_t recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
 	if (errno != EAGAIN && recvsize < 0)
@@ -255,34 +269,40 @@ ssize_t recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct ad
 	return recvsize;
 }
 
+/**************************************************************************/
+/* Funcion que comprueba si la version y el checksum del mensaje es valido. */
+/**************************************************************************/
 int esMensajeValido(struct rcftp_msg mensaje)
 {
 	return mensaje.version == RCFTP_VERSION_1 && issumvalid(&mensaje, sizeof(mensaje)) == 1 ? 1 : 0;
 }
 
+/**************************************************************************/
+/*  Función para ver si la respuesta es la esperada  */
+/**************************************************************************/
 int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv)
 {
-	if (mensaje_sent.flags == F_FIN)
-	{
+	if (mensaje_sent.flags == F_FIN) {
 		return mensaje_recv.flags == F_FIN &&
-			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
+			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	}
-	else
-	{
-		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
+	} else {
+		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
 	}
 }
 
-struct rcftp_msg crearMensajeRCFTP(char *mensaje, size_t length, size_t numseq, int ultimoMensaje)
+/**************************************************************************/
+/* Funcion crear mensaje: Crea un mensaje nuevo RCFTP */
+/**************************************************************************/
+struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, int ultimoMensaje)
 {
 	struct rcftp_msg mensaje_enviar;
 	mensaje_enviar.version = RCFTP_VERSION_1;
-	mensaje_enviar.flags = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
-	mensaje_enviar.numseq = htonl((uint32_t)numseq);
-	mensaje_enviar.next = htonl(0);
-	mensaje_enviar.len = htons((uint16_t)length);
+	mensaje_enviar.flags   = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
+	mensaje_enviar.numseq  = htonl((uint32_t)numseq);
+	mensaje_enviar.next    = htonl(0);
+	mensaje_enviar.len     = htons((uint16_t)length);
 	int j;
 	for (j = 0; j < length; j++)
 	{
@@ -293,18 +313,6 @@ struct rcftp_msg crearMensajeRCFTP(char *mensaje, size_t length, size_t numseq, 
 	return mensaje_enviar;
 }
 
-int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win)
-{
-	if (mensaje_sent.flags == F_FIN) {
-		return mensaje_recv.flags == F_FIN &&
-			   ntohl(mensaje_recv.next) == next_max_win && 
-			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	} else {
-		return (ntohl(mensaje_recv.next) - 1) >= next_min_win && (ntohl(mensaje_recv.next) - 1) <= next_max_win && 
-			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	}
-}
-
 /**************************************************************************/
 /*  algoritmo 1 (basico)  */
 /**************************************************************************/
@@ -312,11 +320,11 @@ void alg_basico(int socket, struct addrinfo *servinfo)
 {
 	int ultimoMensaje = 0;
 	int ultimoMensajeConfirmado = 0;
-	char buffer[RCFTP_BUFLEN];	// Buffer para almacenar los datos.
-	ssize_t length;				// longitud de lo que vamos a leer del fichero
-	ssize_t numeroSec = 0;		// numero de secuencia
-	struct rcftp_msg mensaje;	// Estructura de el envío.
-	struct rcftp_msg respuesta; // Estructura de la respuesta
+	char buffer[RCFTP_BUFLEN]; 			// Buffer para almacenar los datos. 
+	ssize_t length;						// longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0;				// numero de secuencia
+	struct rcftp_msg mensaje;			// Estructura de el envío.
+	struct rcftp_msg respuesta;			// Estructura de la respuesta
 
 	length = readtobuffer(buffer, RCFTP_BUFLEN);
 	if (length < RCFTP_BUFLEN && length >= 0)
@@ -356,149 +364,143 @@ void alg_basico(int socket, struct addrinfo *servinfo)
 	}
 }
 
-/**************************************************************************/
-/*  algoritmo 2 (stop & wait)  */
-/**************************************************************************/
 void alg_stopwait(int socket, struct addrinfo *servinfo)
 {
 	int sockflags;
 	int timeouts_procesados = 0;
-	sockflags = fcntl(socket, F_GETFL, 0);
+	sockflags = fcntl(socket,F_GETFL,0);
 	fcntl(socket, F_SETFL, sockflags | O_NONBLOCK);
-	signal(SIGALRM, handle_sigalrm);
+	signal(SIGALRM,handle_sigalrm);
+	printf("Comunicación con algoritmo stop&wait\n");
 
-	int ultimoMensaje = 0;
-	int ultimoMensajeConfirmado = 0;
+	int ultimoMensaje=0;
+	int ultimoMensajeConfirmado=0;
+	
+	char buffer[RCFTP_BUFLEN]; //Buffer para almacenar los datos. 
+	ssize_t len; //longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0; //numero de secuencia
+	struct rcftp_msg mensajeEnvio;	//Estructura de el envío.
+	struct rcftp_msg mensajeRespuesta; //Estructura de la respuesta
 
-	char buffer[RCFTP_BUFLEN];		   // Buffer para almacenar los datos.
-	ssize_t len;					   // Longitud de lo que vamos a leer del fichero
-	ssize_t numeroSec = 0;			   // Número de secuencia
-	struct rcftp_msg mensajeEnvio;	   // Estructura de el envío.
-	struct rcftp_msg mensajeRespuesta; // Estructura de la respuesta
-
-	len = readtobuffer(buffer, RCFTP_BUFLEN);
-	if (len < RCFTP_BUFLEN && len >= 0)
-	{
+	len=readtobuffer(buffer,RCFTP_BUFLEN); 
+	if (len<RCFTP_BUFLEN && len>= 0){ //Cuando tenemos menos de 512 bytes es cuando estamos enviando el ultimo paquete.
 		ultimoMensaje = 1;
 	}
+	
+	mensajeEnvio=crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); //Creamos la estructura del mensaje que vamos a enviar.
 
-	mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
-
-	while (ultimoMensajeConfirmado == 0)
-	{
+	while (ultimoMensajeConfirmado==0){
+		//Enviando mensaje
 		enviarDatos(&mensajeEnvio, socket, servinfo->ai_addr, servinfo->ai_addrlen);
 		printf("Mensaje enviado\n");
 		print_rcftp_msg(&mensajeEnvio, sizeof(mensajeEnvio));
+		printf("\n");
+		
+        addtimeout();
+        int esperar = 1;
+        int datosRecibidos;
+        
+        while (esperar) {
+            datosRecibidos = recibirDatos(socket, &mensajeRespuesta, sizeof(mensajeRespuesta), servinfo);
+            if (datosRecibidos > 0) {
+                canceltimeout();
+                esperar = 0;
+                printf("Mensaje recibido\n");
+		        print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
+		        printf("\n");
+            }
+            if (timeouts_procesados != timeouts_vencidos) {
+                esperar = 0;
+                timeouts_procesados++;
+            }
+        }
 
-		addtimeout();
-		int esperar = 1;
-		int datosRecibidos;
-
-		while (esperar)
-		{
-			datosRecibidos = recibirDatos(socket, &mensajeRespuesta, sizeof(mensajeRespuesta), servinfo);
-			if (datosRecibidos > 0)
-			{
-				canceltimeout();
-				esperar = 0;
-				printf("Mensaje recibido\n");
-				print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
-			}
-			if (timeouts_procesados != timeouts_vencidos)
-			{
-				esperar = 0;
-				timeouts_procesados++;
-			}
-		}
-
-		if (esMensajeValido(mensajeRespuesta) && respuestaEsperada(mensajeEnvio, mensajeRespuesta))
-		{
-			if (ultimoMensaje == 1)
-			{
+		if(esMensajeValido(mensajeRespuesta) && respuestaEsperada(mensajeEnvio,mensajeRespuesta)){
+			if(ultimoMensaje==1){
 				ultimoMensajeConfirmado = 1;
 			}
-			else
-			{
-				numeroSec = numeroSec + len;
-				len = readtobuffer(buffer, RCFTP_BUFLEN);
-				if (len < RCFTP_BUFLEN && len >= 0)
-				{
-					ultimoMensaje = 1;
+			else{
+				numeroSec = numeroSec + len; //modifica el numero de secuencia segun lo que ha leido
+				len = readtobuffer(buffer,RCFTP_BUFLEN);
+				if(len<RCFTP_BUFLEN && len>= 0){ //Fin del fichero
+					ultimoMensaje= 1;
 				}
-				mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
+				mensajeEnvio=crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
 			}
 		}
 	}
 }
 
 /**************************************************************************/
-/*  algoritmo 3 (ventana deslizante)  */
+/*  Función para ver si la respuesta es la esperada  */
 /**************************************************************************/
-void alg_ventana(int socket, struct addrinfo *servinfo, int window)
+int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win)
 {
+	if (mensaje_sent.flags == F_FIN) {
+		return mensaje_recv.flags == F_FIN &&
+			   ntohl(mensaje_recv.next) == next_max_win && 
+			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
+	} else {
+		return ntohl(mensaje_recv.next) > next_min_win && ntohl(mensaje_recv.next) <= next_max_win && 
+			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
+	}
+}
+
+void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
 	setwindowsize(window);
 	int sockflags;
-	sockflags = fcntl(socket, F_GETFL, 0);
-	fcntl(socket, F_SETFL, sockflags | O_NONBLOCK);
-	signal(SIGALRM, handle_sigalrm);
-	printf("Comunicación con algoritmo go-back-n\n");
-	int numDatosRecibidos = 0;
-	int ultimoMensaje = 0;
-	int ultimoMensajeConfirmado = 0;
-	char buffer[RCFTP_BUFLEN];
-	ssize_t len = 0;
-	ssize_t numeroSec = 0;
-	struct rcftp_msg mensaje;
-	struct rcftp_msg respuesta;
-	int timeouts_procesados = 0;
+    sockflags = fcntl(socket,F_GETFL,0);
+    fcntl(socket,F_SETFL,sockflags|O_NONBLOCK); 
+    signal(SIGALRM,handle_sigalrm);
+    printf("Comunicación con algoritmo go-back-n\n");
+    int numDatosRecibidos = 0;
+    int ultimoMensaje = 0;
+    int ultimoMensajeConfirmado = 0;
+    char buffer[RCFTP_BUFLEN];
+    ssize_t len = 0;
+    ssize_t numeroSec = 0;
+    struct rcftp_msg mensaje;
+    struct rcftp_msg respuesta;
+    int timeouts_procesados = 0;
 	int next_min_win = 0;
 	int next_max_win = 0;
 	int aux = 0;
 	int i;
-	while (!ultimoMensajeConfirmado)
-	{
-
-		if ((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje)
-		{
+    while (!ultimoMensajeConfirmado){
+		
+        if((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje) {
 			numeroSec += len;
-			len = readtobuffer(buffer, RCFTP_BUFLEN);
-			if ((len < RCFTP_BUFLEN) && (len >= 0))
-			{
-				ultimoMensaje = 1;
-			}
-			mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
+            len = readtobuffer(buffer, RCFTP_BUFLEN);
+            if((len < RCFTP_BUFLEN) && (len >= 0)){
+                ultimoMensaje = 1;
+            }
+            mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
 			enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
-			printf("Mensaje enviado\n");
-			addtimeout();
-			addsentdatatowindow(buffer, len);
+            printf("Mensaje enviado\n");
+            addtimeout();
+            addsentdatatowindow(buffer, len);
 			next_max_win += len;
-		}
-		numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
-		if (numDatosRecibidos > 0)
-		{
+        }
+        numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
+        if(numDatosRecibidos > 0){
 			printf("Mensaje recibido\n");
-			if (esMensajeValido(respuesta) && esLaRespuestaEsperadaGBN(mensaje, respuesta, next_min_win, next_max_win))
-			{
-				for (i = 0; i < (ntohl(respuesta.next) - next_min_win) / RCFTP_BUFLEN; i++)
-				{
-					canceltimeout();
-				}
-				freewindow(ntohl(respuesta.next));
+            if (esMensajeValido(respuesta) && esLaRespuestaEsperadaGBN(mensaje,respuesta,next_min_win,next_max_win)) {
+				canceltimeout();
+                freewindow(ntohl(respuesta.next));
 				next_min_win = ntohl(respuesta.next);
-				if (ultimoMensaje)
-				{
-					ultimoMensajeConfirmado = 1;
-				}
-			}
-		}
-		if (timeouts_procesados != timeouts_vencidos)
-		{
+                if (ultimoMensaje) {
+                    ultimoMensajeConfirmado = 1;
+                }
+            }
+        }
+        if (timeouts_procesados != timeouts_vencidos) {
 			int a = RCFTP_BUFLEN;
 			aux = getdatatoresend(buffer, &a);
-			mensaje = crearMensajeRCFTP(buffer, a, aux, ultimoMensaje);
-			enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
-			addtimeout();
-			timeouts_procesados++;
-		}
-	}
+            mensaje = crearMensajeRCFTP(buffer, a, aux, ultimoMensaje); 
+            enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
+            addtimeout();
+            timeouts_procesados++;
+        }
+    }
 }
+
