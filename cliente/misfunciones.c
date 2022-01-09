@@ -246,19 +246,20 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 /**************************************************************************/
 /* Funcion envio de mensaje */
 /**************************************************************************/
-void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
+ssize_t enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
-	ssize_t datosEnviados = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
-	if (datosEnviados != sizeof(*mensaje_enviar) || datosEnviados < 0)
+	ssize_t sendsize = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
+	if (sendsize != sizeof(*mensaje_enviar) || sendsize < 0)
 	{
 		printf("Error en sendto");
 		exit(1);
 	}
+	return sendsize;
 }
 /**************************************************************************/
 /*  Función para recibir datos  */
 /**************************************************************************/
-int recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
+ssize_t recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
 {
 	ssize_t recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
 	if (errno != EAGAIN && recvsize < 0)
@@ -394,8 +395,6 @@ void alg_stopwait(int socket, struct addrinfo *servinfo)
 		enviarDatos(&mensajeEnvio, socket, servinfo->ai_addr, servinfo->ai_addrlen);
 		printf("Mensaje enviado\n");
 		print_rcftp_msg(&mensajeEnvio, sizeof(mensajeEnvio));
-		printf("\n");
-		
         addtimeout();
         int esperar = 1;
         int datosRecibidos;
@@ -406,8 +405,7 @@ void alg_stopwait(int socket, struct addrinfo *servinfo)
                 canceltimeout();
                 esperar = 0;
                 printf("Mensaje recibido\n");
-		        print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
-		        printf("\n");
+				print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
             }
             if (timeouts_procesados != timeouts_vencidos) {
                 esperar = 0;
@@ -449,9 +447,9 @@ int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg men
 void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
 	setwindowsize(window);
 	int sockflags;
-    sockflags = fcntl(socket,F_GETFL,0);
-    fcntl(socket,F_SETFL,sockflags|O_NONBLOCK); 
-    signal(SIGALRM,handle_sigalrm);
+    sockflags = fcntl(socket, F_GETFL, 0);
+    fcntl(socket, F_SETFL, sockflags| O_NONBLOCK); 
+    signal(SIGALRM, handle_sigalrm);
     printf("Comunicación con algoritmo go-back-n\n");
     int numDatosRecibidos = 0;
     int ultimoMensaje = 0;
@@ -465,25 +463,26 @@ void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
 	int next_min_win = 0;
 	int next_max_win = 0;
 	int aux = 0;
-	int i;
     while (!ultimoMensajeConfirmado){
 		
-        if((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje) {
+        if ((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje) {
 			numeroSec += len;
             len = readtobuffer(buffer, RCFTP_BUFLEN);
-            if((len < RCFTP_BUFLEN) && (len >= 0)){
+            if ((len < RCFTP_BUFLEN) && (len >= 0)) {
                 ultimoMensaje = 1;
             }
             mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
 			enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
             printf("Mensaje enviado\n");
+			print_rcftp_msg(&mensaje, sizeof(mensaje));
             addtimeout();
             addsentdatatowindow(buffer, len);
 			next_max_win += len;
         }
         numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
-        if(numDatosRecibidos > 0){
+        if (numDatosRecibidos > 0) {
 			printf("Mensaje recibido\n");
+			print_rcftp_msg(&respuesta, sizeof(respuesta));
             if (esMensajeValido(respuesta) && esLaRespuestaEsperadaGBN(mensaje,respuesta,next_min_win,next_max_win)) {
 				canceltimeout();
                 freewindow(ntohl(respuesta.next));
