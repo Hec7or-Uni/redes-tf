@@ -283,12 +283,15 @@ int esMensajeValido(struct rcftp_msg mensaje)
 /**************************************************************************/
 int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv)
 {
-	if (mensaje_sent.flags == F_FIN) {
+	if (mensaje_sent.flags == F_FIN)
+	{
 		return mensaje_recv.flags == F_FIN &&
-			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
+			   ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	} else {
-		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) && 
+	}
+	else
+	{
+		return ntohl(mensaje_recv.next) == (ntohl(mensaje_sent.numseq) + ntohs(mensaje_sent.len)) &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
 	}
 }
@@ -296,14 +299,14 @@ int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_re
 /**************************************************************************/
 /* Funcion crear mensaje: Crea un mensaje nuevo RCFTP */
 /**************************************************************************/
-struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, int ultimoMensaje)
+struct rcftp_msg crearMensajeRCFTP(char *mensaje, size_t length, size_t numseq, int ultimoMensaje)
 {
 	struct rcftp_msg mensaje_enviar;
 	mensaje_enviar.version = RCFTP_VERSION_1;
-	mensaje_enviar.flags   = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
-	mensaje_enviar.numseq  = htonl((uint32_t)numseq);
-	mensaje_enviar.next    = htonl(0);
-	mensaje_enviar.len     = htons((uint16_t)length);
+	mensaje_enviar.flags = (ultimoMensaje == 1) ? F_FIN : F_NOFLAGS;
+	mensaje_enviar.numseq = htonl((uint32_t)numseq);
+	mensaje_enviar.next = htonl(0);
+	mensaje_enviar.len = htons((uint16_t)length);
 	int j;
 	for (j = 0; j < length; j++)
 	{
@@ -321,11 +324,11 @@ void alg_basico(int socket, struct addrinfo *servinfo)
 {
 	int ultimoMensaje = 0;
 	int ultimoMensajeConfirmado = 0;
-	char buffer[RCFTP_BUFLEN]; 			// Buffer para almacenar los datos. 
-	ssize_t length;						// longitud de lo que vamos a leer del fichero
-	ssize_t numeroSec = 0;				// numero de secuencia
-	struct rcftp_msg mensaje;			// Estructura de el envío.
-	struct rcftp_msg respuesta;			// Estructura de la respuesta
+	char buffer[RCFTP_BUFLEN];	// Buffer para almacenar los datos.
+	ssize_t length;				// longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0;		// numero de secuencia
+	struct rcftp_msg mensaje;	// Estructura de el envío.
+	struct rcftp_msg respuesta; // Estructura de la respuesta
 
 	length = readtobuffer(buffer, RCFTP_BUFLEN);
 	if (length < RCFTP_BUFLEN && length >= 0)
@@ -369,61 +372,67 @@ void alg_stopwait(int socket, struct addrinfo *servinfo)
 {
 	int sockflags;
 	int timeouts_procesados = 0;
-	sockflags = fcntl(socket,F_GETFL,0);
+	sockflags = fcntl(socket, F_GETFL, 0);
 	fcntl(socket, F_SETFL, sockflags | O_NONBLOCK);
-	signal(SIGALRM,handle_sigalrm);
-	printf("Comunicación con algoritmo stop&wait\n");
+	signal(SIGALRM, handle_sigalrm);
+	int ultimoMensaje = 0;
+	int ultimoMensajeConfirmado = 0;
+	char buffer[RCFTP_BUFLEN];		   // Buffer para almacenar los datos.
+	ssize_t len;					   // longitud de lo que vamos a leer del fichero
+	ssize_t numeroSec = 0;			   // numero de secuencia
+	struct rcftp_msg mensajeEnvio;	   // Estructura de el envío.
+	struct rcftp_msg mensajeRespuesta; // Estructura de la respuesta
 
-	int ultimoMensaje=0;
-	int ultimoMensajeConfirmado=0;
-	
-	char buffer[RCFTP_BUFLEN]; //Buffer para almacenar los datos. 
-	ssize_t len; //longitud de lo que vamos a leer del fichero
-	ssize_t numeroSec = 0; //numero de secuencia
-	struct rcftp_msg mensajeEnvio;	//Estructura de el envío.
-	struct rcftp_msg mensajeRespuesta; //Estructura de la respuesta
-
-	len=readtobuffer(buffer,RCFTP_BUFLEN); 
-	if (len<RCFTP_BUFLEN && len>= 0){ //Cuando tenemos menos de 512 bytes es cuando estamos enviando el ultimo paquete.
+	len = readtobuffer(buffer, RCFTP_BUFLEN);
+	if (len < RCFTP_BUFLEN && len >= 0)
+	{ // Cuando tenemos menos de 512 bytes es cuando estamos enviando el ultimo paquete.
 		ultimoMensaje = 1;
 	}
-	
-	mensajeEnvio=crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); //Creamos la estructura del mensaje que vamos a enviar.
 
-	while (ultimoMensajeConfirmado==0){
-		//Enviando mensaje
+	mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); // Creamos la estructura del mensaje que vamos a enviar.
+
+	while (ultimoMensajeConfirmado == 0)
+	{
+		// Enviando mensaje
 		enviarDatos(&mensajeEnvio, socket, servinfo->ai_addr, servinfo->ai_addrlen);
 		printf("Mensaje enviado\n");
 		print_rcftp_msg(&mensajeEnvio, sizeof(mensajeEnvio));
-        addtimeout();
-        int esperar = 1;
-        int datosRecibidos;
-        
-        while (esperar) {
-            datosRecibidos = recibirDatos(socket, &mensajeRespuesta, sizeof(mensajeRespuesta), servinfo);
-            if (datosRecibidos > 0) {
-                canceltimeout();
-                esperar = 0;
-                printf("Mensaje recibido\n");
-				print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
-            }
-            if (timeouts_procesados != timeouts_vencidos) {
-                esperar = 0;
-                timeouts_procesados++;
-            }
-        }
+		addtimeout();
+		int esperar = 1;
+		int datosRecibidos;
 
-		if(esMensajeValido(mensajeRespuesta) && respuestaEsperada(mensajeEnvio,mensajeRespuesta)){
-			if(ultimoMensaje==1){
+		while (esperar)
+		{
+			datosRecibidos = recibirDatos(socket, &mensajeRespuesta, sizeof(mensajeRespuesta), servinfo);
+			if (datosRecibidos > 0)
+			{
+				canceltimeout();
+				esperar = 0;
+				printf("Mensaje recibido\n");
+				print_rcftp_msg(&mensajeRespuesta, sizeof(mensajeRespuesta));
+			}
+			if (timeouts_procesados != timeouts_vencidos)
+			{
+				esperar = 0;
+				timeouts_procesados++;
+			}
+		}
+
+		if (esMensajeValido(mensajeRespuesta) && respuestaEsperada(mensajeEnvio, mensajeRespuesta))
+		{
+			if (ultimoMensaje == 1)
+			{
 				ultimoMensajeConfirmado = 1;
 			}
-			else{
-				numeroSec = numeroSec + len; //modifica el numero de secuencia segun lo que ha leido
-				len = readtobuffer(buffer,RCFTP_BUFLEN);
-				if(len<RCFTP_BUFLEN && len>= 0){ //Fin del fichero
-					ultimoMensaje= 1;
+			else
+			{
+				numeroSec = numeroSec + len; // modifica el numero de secuencia segun lo que ha leido
+				len = readtobuffer(buffer, RCFTP_BUFLEN);
+				if (len < RCFTP_BUFLEN && len >= 0)
+				{ // Fin del fichero
+					ultimoMensaje = 1;
 				}
-				mensajeEnvio=crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
+				mensajeEnvio = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
 			}
 		}
 	}
@@ -434,72 +443,81 @@ void alg_stopwait(int socket, struct addrinfo *servinfo)
 /**************************************************************************/
 int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win)
 {
-	if (mensaje_sent.flags == F_FIN) {
+	if (mensaje_sent.flags == F_FIN)
+	{
 		return mensaje_recv.flags == F_FIN &&
-			   ntohl(mensaje_recv.next) == next_max_win && 
+			   ntohl(mensaje_recv.next) == next_max_win &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
-	} else {
-		return ntohl(mensaje_recv.next) > next_min_win && ntohl(mensaje_recv.next) <= next_max_win && 
+	}
+	else
+	{
+		return ntohl(mensaje_recv.next) > next_min_win && ntohl(mensaje_recv.next) <= next_max_win &&
 			   mensaje_recv.flags != F_BUSY && mensaje_recv.flags != F_ABORT;
 	}
 }
 
-void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
+void alg_ventana(int socket, struct addrinfo *servinfo, int window)
+{
 	setwindowsize(window);
 	int sockflags;
-    sockflags = fcntl(socket, F_GETFL, 0);
-    fcntl(socket, F_SETFL, sockflags| O_NONBLOCK); 
-    signal(SIGALRM, handle_sigalrm);
-    printf("Comunicación con algoritmo go-back-n\n");
-    int numDatosRecibidos = 0;
-    int ultimoMensaje = 0;
-    int ultimoMensajeConfirmado = 0;
-    char buffer[RCFTP_BUFLEN];
-    ssize_t len = 0;
-    ssize_t numeroSec = 0;
-    struct rcftp_msg mensaje;
-    struct rcftp_msg respuesta;
-    int timeouts_procesados = 0;
+	sockflags = fcntl(socket, F_GETFL, 0);
+	fcntl(socket, F_SETFL, sockflags | O_NONBLOCK);
+	signal(SIGALRM, handle_sigalrm);
+	printf("Comunicación con algoritmo go-back-n\n");
+	int numDatosRecibidos = 0;
+	int ultimoMensaje = 0;
+	int ultimoMensajeConfirmado = 0;
+	char buffer[RCFTP_BUFLEN];
+	ssize_t len = 0;
+	ssize_t numeroSec = 0;
+	struct rcftp_msg mensaje;
+	struct rcftp_msg respuesta;
+	int timeouts_procesados = 0;
 	int next_min_win = 0;
 	int next_max_win = 0;
 	int aux = 0;
-    while (!ultimoMensajeConfirmado){
-		
-        if ((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje) {
+	while (!ultimoMensajeConfirmado)
+	{
+		if ((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje)
+		{
 			numeroSec += len;
-            len = readtobuffer(buffer, RCFTP_BUFLEN);
-            if ((len < RCFTP_BUFLEN) && (len >= 0)) {
-                ultimoMensaje = 1;
-            }
-            mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
+			len = readtobuffer(buffer, RCFTP_BUFLEN);
+			if ((len < RCFTP_BUFLEN) && (len >= 0))
+			{
+				ultimoMensaje = 1;
+			}
+			mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje);
 			enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
-            printf("Mensaje enviado\n");
+			printf("Mensaje enviado\n");
 			print_rcftp_msg(&mensaje, sizeof(mensaje));
-            addtimeout();
-            addsentdatatowindow(buffer, len);
+			addtimeout();
+			addsentdatatowindow(buffer, len);
 			next_max_win += len;
-        }
-        numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
-        if (numDatosRecibidos > 0) {
+		}
+		numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
+		if (numDatosRecibidos > 0)
+		{
 			printf("Mensaje recibido\n");
 			print_rcftp_msg(&respuesta, sizeof(respuesta));
-            if (esMensajeValido(respuesta) && esLaRespuestaEsperadaGBN(mensaje,respuesta,next_min_win,next_max_win)) {
+			if (esMensajeValido(respuesta) && esLaRespuestaEsperadaGBN(mensaje, respuesta, next_min_win, next_max_win))
+			{
 				canceltimeout();
-                freewindow(ntohl(respuesta.next));
+				freewindow(ntohl(respuesta.next));
 				next_min_win = ntohl(respuesta.next);
-                if (ultimoMensaje) {
-                    ultimoMensajeConfirmado = 1;
-                }
-            }
-        }
-        if (timeouts_procesados != timeouts_vencidos) {
+				if (ultimoMensaje)
+				{
+					ultimoMensajeConfirmado = 1;
+				}
+			}
+		}
+		if (timeouts_procesados != timeouts_vencidos)
+		{
 			int a = RCFTP_BUFLEN;
 			aux = getdatatoresend(buffer, &a);
-            mensaje = crearMensajeRCFTP(buffer, a, aux, ultimoMensaje); 
-            enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
-            addtimeout();
-            timeouts_procesados++;
-        }
-    }
+			mensaje = crearMensajeRCFTP(buffer, a, aux, ultimoMensaje);
+			enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
+			addtimeout();
+			timeouts_procesados++;
+		}
+	}
 }
-

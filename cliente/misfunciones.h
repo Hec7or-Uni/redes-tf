@@ -13,14 +13,14 @@
  * @param[in] f_verbose Flag para imprimir información adicional
  * @return Dirección de estructura con la dirección del servidor
  */
-struct addrinfo* obtener_struct_direccion(char *dir_servidor, char *servicio, char f_verbose);
+struct addrinfo *obtener_struct_direccion(char *dir_servidor, char *servicio, char f_verbose);
 
 /**
  * Imprime una estructura sockaddr_in o sockaddr_in6 almacenada en sockaddr_storage
  *
  * @param[in] saddr Estructura de dirección
  */
-void printsockaddr(struct sockaddr_storage * saddr);
+void printsockaddr(struct sockaddr_storage *saddr);
 
 /**
  * Configura el socket
@@ -40,8 +40,8 @@ int initsocket(struct addrinfo *servinfo, char f_verbose);
  * @param[in] remotelen Tamaño en bytes de la dirección
  * @return bytes enviados
  */
-int enviarDatos(struct rcftp_msg *mensaje, int socket, struct sockaddr *remote, socklen_t remotelen); 
-	
+int enviarDatos(struct rcftp_msg *mensaje, int socket, struct sockaddr *remote, socklen_t remotelen);
+
 /**
  * Recibe un mensaje
  *
@@ -62,7 +62,7 @@ int recibirDatos(int socket, struct rcftp_msg *respuesta, int length, struct add
  * @param[in] ultimoMensaje booleano que indica si es el mensaje final
  * @return struct rcftp_msg
  */
-struct rcftp_msg crearMensajeRCFTP(char* mensaje, size_t length, size_t numseq, int ultimoMensaje);
+struct rcftp_msg crearMensajeRCFTP(char *mensaje, size_t length, size_t numseq, int ultimoMensaje);
 
 /**
  * Funcion crear mensaje: Crea un mensaje nuevo RCFTP
@@ -83,7 +83,7 @@ int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_re
 
 /**
  * Comprueba que es la respuesta esperada
- * 
+ *
  * @param[in] mensaje_sent mensaje enviado
  * @param[in] mensaje_recv mensaje recibido
  * @param[in] next_min_win valor minimo de la ventana
