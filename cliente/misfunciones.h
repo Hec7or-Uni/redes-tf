@@ -40,7 +40,7 @@ int initsocket(struct addrinfo *servinfo, char f_verbose);
  * @param[in] remotelen Tamaño en bytes de la dirección
  * @return bytes enviados
  */
-ssize_t enviarDatos(struct rcftp_msg *mensaje, int socket, struct sockaddr *remote, socklen_t remotelen); 
+int enviarDatos(struct rcftp_msg *mensaje, int socket, struct sockaddr *remote, socklen_t remotelen); 
 	
 /**
  * Recibe un mensaje
@@ -51,7 +51,7 @@ ssize_t enviarDatos(struct rcftp_msg *mensaje, int socket, struct sockaddr *remo
  * @param[in] servinfo Estructura con la dirección del servidor
  * @return bytes recibidos
  */
-ssize_t recibirDatos(int socket, struct rcftp_msg *respuesta, int length, struct addrinfo *servinfo);
+int recibirDatos(int socket, struct rcftp_msg *respuesta, int length, struct addrinfo *servinfo);
 
 /**
  * Funcion crear mensaje: Crea un mensaje nuevo RCFTP

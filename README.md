@@ -79,7 +79,7 @@ Espacio para implementar las funciones que necesites.
 ```
 `ejemplo cliente`
 ```shell
-cat fichero.txt | ./rcftpclient -v -a1 -d155.210.152.183 -p32002
+cat fichero.txt | ./rcftpclient -v -a1 -d155.210.152.177 -p32002
 ```
 
 `servidor`
