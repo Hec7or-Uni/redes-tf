@@ -90,7 +90,7 @@ int respuestaEsperada(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_re
  * @param[in] next_max_win valor maximo de la ventana
  * @return 1: esperada, 0: no esperada
  */
-int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win);
+int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_recv, int next_min_win, int numSec);
 
 /**
  * Algoritmo 1 del cliente

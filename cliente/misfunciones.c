@@ -246,21 +246,22 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 /**************************************************************************/
 /* Funcion envio de mensaje */
 /**************************************************************************/
-void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
+int enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
-	ssize_t datosEnviados = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
-	if (datosEnviados != sizeof(*mensaje_enviar) || datosEnviados < 0)
+	ssize_t sendsize = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
+	if (sendsize != sizeof(*mensaje_enviar) || sendsize < 0)
 	{
 		printf("Error en sendto");
 		exit(1);
 	}
+	return sendsize;
 }
 /**************************************************************************/
 /*  Función para recibir datos  */
 /**************************************************************************/
 int recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
 {
-	ssize_t recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
+	int recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
 	if (errno != EAGAIN && recvsize < 0)
 	{
 		printf("Error en rcvfrom");
@@ -438,8 +439,8 @@ int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_recv, int next_min_win, in
 {
 	if (mensaje_recv.version != RCFTP_VERSION_1) return 0;
 	if (!issumvalid(&mensaje_recv, sizeof(mensaje_recv))) return 0;
-	if(ntohl(mensaje_recv.next) <= next_min_win || ntohl(mensaje_recv.next) > numSec) return 0;
-	if(mensaje_recv.flags == F_ABORT || mensaje_recv.flags == F_BUSY) return 0;
+	if (ntohl(mensaje_recv.next) <= next_min_win || ntohl(mensaje_recv.next) > numSec) return 0;
+	if (mensaje_recv.flags == F_ABORT || mensaje_recv.flags == F_BUSY) return 0;
 	return 1;
 }
 
