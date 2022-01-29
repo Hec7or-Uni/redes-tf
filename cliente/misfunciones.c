@@ -246,22 +246,21 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 /**************************************************************************/
 /* Funcion envio de mensaje */
 /**************************************************************************/
-int enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
+void enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
-	int sendsize = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
-	if (sendsize != sizeof(*mensaje_enviar) || sendsize < 0)
+	ssize_t datosEnviados = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
+	if (datosEnviados != sizeof(*mensaje_enviar) || datosEnviados < 0)
 	{
 		printf("Error en sendto");
 		exit(1);
 	}
-	return sendsize;
 }
 /**************************************************************************/
 /*  Función para recibir datos  */
 /**************************************************************************/
 int recibirDatos(int socket, struct rcftp_msg *buffer, int length, struct addrinfo *servinfo)
 {
-	int recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
+	ssize_t recvsize = recvfrom(socket, (char *)buffer, length, 0, (struct sockaddr *)servinfo, &servinfo->ai_addrlen);
 	if (errno != EAGAIN && recvsize < 0)
 	{
 		printf("Error en rcvfrom");
@@ -435,11 +434,11 @@ void alg_stopwait(int socket, struct addrinfo *servinfo)
 /**************************************************************************/
 /*  Función para ver si la respuesta es la esperada  */
 /**************************************************************************/
-int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_sent, struct rcftp_msg mensaje_recv, int next_min_win, int next_max_win)
+int esLaRespuestaEsperadaGBN(struct rcftp_msg mensaje_recv, int next_min_win, int numSec)
 {
 	if (mensaje_recv.version != RCFTP_VERSION_1) return 0;
 	if (!issumvalid(&mensaje_recv, sizeof(mensaje_recv))) return 0;
-	if(ntohl(mensaje_recv.next) <= next_min_win || ntohl(mensaje_recv.next) > next_max_win) return 0;
+	if(ntohl(mensaje_recv.next) <= next_min_win || ntohl(mensaje_recv.next) > numSec) return 0;
 	if(mensaje_recv.flags == F_ABORT || mensaje_recv.flags == F_BUSY) return 0;
 	return 1;
 }
@@ -455,19 +454,18 @@ void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
     int ultimoMensaje = 0;
     int ultimoMensajeConfirmado = 0;
     char buffer[RCFTP_BUFLEN];
-    ssize_t len = 0;
-    ssize_t numeroSec = 0;
+    int len = 0;
+    int numeroSec = 0;
     struct rcftp_msg mensaje;
     struct rcftp_msg respuesta;
     int timeouts_procesados = 0;
 	int next_min_win = 0;
-	int next_max_win = 0;
 	int aux = 0;
     while (!ultimoMensajeConfirmado){
 		
         if((getfreespace() >= RCFTP_BUFLEN) && !ultimoMensaje) {
             len = readtobuffer(buffer, RCFTP_BUFLEN);
-            if((len < RCFTP_BUFLEN)){
+            if(len < RCFTP_BUFLEN){
                 ultimoMensaje = 1;
             }
             mensaje = crearMensajeRCFTP(buffer, len, numeroSec, ultimoMensaje); 
@@ -477,12 +475,11 @@ void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
             printf("Mensaje enviado\n");
             addtimeout();
             addsentdatatowindow(buffer, len);
-			next_max_win += len;
         }
         numDatosRecibidos = recibirDatos(socket, &respuesta, sizeof(respuesta), servinfo);
         if(numDatosRecibidos > 0){
 			printf("Mensaje recibido\n");
-            if (esLaRespuestaEsperadaGBN(mensaje,respuesta,next_min_win,next_max_win)) {
+            if (esLaRespuestaEsperadaGBN(respuesta,next_min_win,numeroSec)) {
 				canceltimeout();
                 freewindow(ntohl(respuesta.next));
 				next_min_win = ntohl(respuesta.next);
@@ -495,8 +492,10 @@ void alg_ventana(int socket, struct addrinfo *servinfo,int window) {
 			int a = RCFTP_BUFLEN;
 			aux = getdatatoresend(buffer, &a);
             mensaje = crearMensajeRCFTP(buffer, a, aux, ultimoMensaje); 
-			if(a < RCFTP_BUFLEN) {
+			if(a < RCFTP_BUFLEN && ultimoMensaje) {
 				mensaje.flags = F_FIN;
+				mensaje.sum = 0;
+                mensaje.sum = xsum((char*)&mensaje, sizeof(mensaje));
 			}
             enviarDatos(&mensaje, socket, servinfo->ai_addr, servinfo->ai_addrlen);
             addtimeout();
