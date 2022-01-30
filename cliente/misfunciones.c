@@ -248,7 +248,7 @@ int initsocket(struct addrinfo *servinfo, char f_verbose)
 /**************************************************************************/
 int enviarDatos(struct rcftp_msg *mensaje_enviar, int socket, struct sockaddr *remote, socklen_t remotelen)
 {
-	ssize_t sendsize = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
+	int sendsize = sendto(socket, mensaje_enviar, sizeof(*mensaje_enviar), 0, remote, remotelen);
 	if (sendsize != sizeof(*mensaje_enviar) || sendsize < 0)
 	{
 		printf("Error en sendto");
